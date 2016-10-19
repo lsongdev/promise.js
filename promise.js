@@ -3,18 +3,45 @@
  * [Promise description]
  * @param {Function} fn [description]
  */
-function Promise(){
+function Promise(fn){
   this.callbacks = [];
   this.state = Promise.STATES.PENDING;
+  
+  if(typeof fn === 'function'){
+    fn(this.resolve, this.reject);
+  }
+  
   return this;
 };
 
 // A promise must be in one of three states:
 // pending, fulfilled, or rejected.
 Promise.STATES = {
-  PENDING   : 'pending'  ,
-	FULFILLED : 'fulfilled',
-	REJECTED  : 'rejected'
+  PENDING   : 0x01,
+  FULFILLED : 0x02,
+  REJECTED  : 0x03
+};
+
+/**
+ * [resolve description]
+ * @param  {[type]} value [description]
+ * @return {[type]}       [description]
+ */
+Promise.resolve = function(value){
+  var promise = new Promise();
+  promise.resolve(value);
+  return promise;
+};
+
+/**
+ * [reject description]
+ * @param  {[type]} reason [description]
+ * @return {[type]}        [description]
+ */
+Promise.reject = function(reason){
+  var promise = new Promise();
+  promise.reject(reason);
+  return promise;
 };
 
 /**
@@ -30,11 +57,11 @@ Promise.prototype.transition = function(state, x){
     switch(state){
       case Promise.STATES.FULFILLED:
         this.value = x;
-        this.state = Promise.STATES.FULFILLED;
+        this.state = state;
         break;
       case Promise.STATES.REJECTED:
         this.reason = x;
-        this.state = Promise.STATES.REJECTED;
+        this.state = state;
         break;
     }
     // 2.2.6.1 & 2.2.6.2 If/when promise is fulfilled,
@@ -182,28 +209,6 @@ Promise.prototype.then = function(onFulfilled, onRejected){
     schedulePromise2Resolution();
   }
   return promise2;
-};
-
-/**
- * [resolve description]
- * @param  {[type]} value [description]
- * @return {[type]}       [description]
- */
-Promise.resolve = function(value){
-  var promise = new Promise();
-  promise.resolve(value);
-  return promise;
-};
-
-/**
- * [reject description]
- * @param  {[type]} reason [description]
- * @return {[type]}        [description]
- */
-Promise.reject = function(reason){
-  var promise = new Promise();
-  promise.reject(reason);
-  return promise;
 };
 
 module.exports = Promise;
