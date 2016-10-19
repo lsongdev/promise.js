@@ -1,25 +1,66 @@
-
+'use strict';
 /**
  * [Promise description]
  * @param {Function} fn [description]
  */
-function Promise(fn){
-  
-  // if (!(this instanceof Promise))
-  //   throw new TypeError('Not enough arguments to Promise.');
-  // if (!fn || typeof fn !== 'function')
-  //   throw new TypeError('Argument 1 of Promise.constructor is not an object.');
-
-  // A promise must be in one of three states: pending, fulfilled, or rejected.
-  this.state = Promise.STATE.PENDING;
-  this.handlers = [];
+function Promise(){
+  this.callbacks = [];
+  this.state = Promise.STATES.PENDING;
   return this;
 };
 
-Promise.STATE = {
+// A promise must be in one of three states:
+// pending, fulfilled, or rejected.
+Promise.STATES = {
   PENDING   : 'pending'  ,
 	FULFILLED : 'fulfilled',
 	REJECTED  : 'rejected'
+};
+
+Promise.prototype.transition = function(state, x){
+  // 2.1.1 When pending, a promise:
+  if(this.state === Promise.STATES.PENDING){
+    // 2.1.1.1 may transition to either the fulfilled or rejected state.
+    switch(state){
+      case Promise.STATES.FULFILLED:
+        this.value = x;
+        this.state = Promise.STATES.FULFILLED;
+        break;
+      case Promise.STATES.REJECTED:
+        this.reason = x;
+        this.state = Promise.STATES.REJECTED;
+        break;
+    }
+    // 2.2.6.1 & 2.2.6.2 If/when promise is fulfilled,
+    // all respective callbacks must execute in the order of their originating calls to then
+    this.callbacks.forEach(function(schedulePromise2Resolution){
+      schedulePromise2Resolution();
+    });
+  }else{
+    // 2.1.2 When fulfilled, a promise:
+    // 2.1.3 When rejected, a promise:
+    //
+    // must not transition to any other state.
+    // must have a reason, which must not change.
+  }
+  return this;
+};
+
+/**
+ * [resolve description]
+ * @param  {[type]} value [description]
+ * @return {[type]}       [description]
+ */
+Promise.prototype.resolve = function(value){
+  return this.transition(Promise.STATES.FULFILLED, value);
+};
+
+/**
+ * [catch description]
+ * @return {[type]} [description]
+ */
+Promise.prototype.reject = function(reason){
+  return this.transition(Promise.STATES.REJECTED, reason);
 };
 
 /**
@@ -29,55 +70,65 @@ Promise.STATE = {
  * @return {[type]}             [description]
  */
 Promise.prototype.then = function(onFulfilled, onRejected){
-  var promise = new Promise();
-  switch(this.state){
-    case Promise.STATE.PENDING:
-      this.handlers.push({
-        resolve: onFulfilled,
-        reject : onRejected
-      });
-      break;
-    case Promise.STATE.FULFILLED:
-      if(typeof onFulfilled == 'function'){
+  var self = this;
+  var runAsync = setTimeout;
+  var promise2 = new Promise();
+  function resolutionProcedure(promise, x){
+    // 2.3.1 If promise and x refer to the same object, reject promise with a TypeError as the reason.
+    if(promise === x){
+      promise.reject(new TypeError('Spec 2.3.1, promise and x should not be the same object'));
+    }
+    // 2.3.3 Otherwise, if x is an object or function,
+    if((x !== null) && ( typeof x === 'object' || typeof x === 'function')){
+      // 2.3.3.1 Let then be x.then.
+      var then = x.then;
+      // 2.3.3.3 If then is a function, call it with x as this
+      if(typeof then === 'function'){
         try{
-          var x = onFulfilled.apply(undefined, this.value);
+          then.call(x,
+          // first argument resolvePromise
+          function resolvePromise(y){
+            // 2.3.3.3.1 If/when resolvePromise is called with a value y,
+            // run [[Resolve]](promise, y).
+            resolutionProcedure(promise, y);
+          },
+          // and second argument rejectPromise
+          function rejectPromise(r){
+            // 2.3.3.3.2 If/when rejectPromise is called with a reason r,
+            // reject promise with r.
+            promise.reject(r);
+          });
         }catch(e){
-          promise.reason = e;
-          promise.state = Promise.STATE.REJECTED;
+          promise.reject(e);
         }
       }else{
-        // 2.2.7.3 If onFulfilled is not a function and promise1 is fulfilled,
-        //         promise2 must be fulfilled with the same value as promise1.
-        promise.state = this.state;
-        promise.value = this.value;
+        // TODO: 2.3.3.3.4.1 If resolvePromise or rejectPromise have been called, ignore it.
+        promise.resolve(x);
       }
-      break;
-    case Promise.STATE.REJECTED:
-      if(typeof onRejected == 'function'){
-        try{
-          var x = onRejected.apply(undefined, this.reason);
-        }catch(e){
-          promise.reason = e;
-          promise.state = Promise.STATE.REJECTED;
-        }
-      }else{
-        // 2.2.7.4 If onRejected is not a function and promise1 is rejected,
-        //        promise2 must be rejected with the same reason as promise1.
-        promise.state = this.state;
-        promise.reason = this.reason;
-      }
-      break;
+    }else{
+      // 2.3.4 If x is not an object or function, fulfill promise with x.
+      promise.resolve(x);
+    }
   }
-  return promise;
+  function schedulePromise2Resolution(){
+    runAsync(function(){
+      try{
+        var resolved = (self.state == Promise.STATES.FULFILLED);
+        var x = (resolved ? onFulfilled : onRejected).apply(undefined, resolved ? self.value : self.reason);
+        resolutionProcedure(promise2, x);
+      }catch(e){
+        promise2.reject(e);
+      }
+    });
+  }
+  if(this.state === Promise.STATES.PENDING){
+    this.callbacks.push(schedulePromise2Resolution);
+  }else{
+    schedulePromise2Resolution();
+  }
+  return promise2;
 };
 
-/**
- * [catch description]
- * @return {[type]} [description]
- */
-Promise.prototype.catch = function(){
-  
-};
 
 /**
  * [resolve description]
@@ -86,7 +137,7 @@ Promise.prototype.catch = function(){
  */
 Promise.resolve = function(value){
   var promise = new Promise();
-  promise.state = Promise.STATE.FULFILLED;
+  promise.state = Promise.STATES.FULFILLED;
 	promise.value = value;
   return promise;
 };
@@ -98,24 +149,9 @@ Promise.resolve = function(value){
  */
 Promise.reject = function(reason){
   var promise = new Promise();
-  promise.state = Promise.STATE.REJECTED;
+  promise.state = Promise.STATES.REJECTED;
 	promise.reason = reason;
   return promise;
-};
-
-Promise.fulfill = function(value){
-  var promise = new Promise();
-  promise.state = Promise.STATE.FULFILLED;
-	promise.value = value;
-  return promise;
-};
-
-/**
- * [all description]
- * @return {[type]} [description]
- */
-Promise.all = function(){
-  
 };
 
 
