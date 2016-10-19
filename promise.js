@@ -49,7 +49,6 @@ Promise.prototype.transition = function(state, x){
     // must not transition to any other state.
     // must have a reason, which must not change.
   }
-  // return this;
 };
 
 /**
@@ -78,7 +77,9 @@ Promise.prototype.reject = function(reason){
 Promise.prototype.then = function(onFulfilled, onRejected){
   var promise1 = this;
   var promise2 = new Promise();
-  var runAsync = setTimeout;
+  var nextTick = process ? process.nextTick : function nextTick(fn){
+    setTimeout(fn);
+  };
   /**
    * 2.3 The Promise Resolution Procedure
    * @param  {[type]} promise [description]
@@ -89,9 +90,15 @@ Promise.prototype.then = function(onFulfilled, onRejected){
     // 2.3.1 If promise and x refer to the same object, reject promise with a TypeError as the reason.
     if(promise === x){
       promise.reject(new TypeError('Spec 2.3.1, promise and x should not be the same object'));
-    }
+      // 2.3.2 If x is a promise, adopt its state [3.4]:
+    }else if(x instanceof Promise){
+      x.then(function(value){
+        promise.resolve(value);
+      }, function(reason){
+        promise.reject(reason);
+      })
     // 2.3.3 Otherwise, if x is an object or function,
-    if((x !== null) && ( typeof x === 'object' || typeof x === 'function')){
+    }else if((x !== null) && ( typeof x === 'object' || typeof x === 'function')){
       // 2.3.3.1 Let then be x.then.
       var then = x.then;
       // 2.3.3.3 If then is a function, call it with x as this
@@ -136,11 +143,11 @@ Promise.prototype.then = function(onFulfilled, onRejected){
     }
   }
   function schedulePromise2Resolution(){
-    runAsync(function(){
+    nextTick(function(){
       try{
         // 2.2.2 If onFulfilled is a function:
         if(typeof onFulfilled === 'function'){
-          var x = onFulfilled.apply(undefined, promise1.value);
+          var x = onFulfilled.call(undefined, promise1.value);
           // 2.2.7.1 If either onFulfilled or onRejected returns a value x,
           // run the Promise Resolution Procedure [[Resolve]](promise2, x).
           if(x !== undefined) resolutionProcedure(promise2, x);
@@ -152,7 +159,7 @@ Promise.prototype.then = function(onFulfilled, onRejected){
         }
         // 2.2.3 If onRejected is a function,
         if(typeof onRejected === 'function'){
-          var x = onRejected.apply(undefined, promise1.reason);
+          var x = onRejected.call(undefined, promise1.reason);
           // 2.2.7.1 If either onFulfilled or onRejected returns a value x,
           // run the Promise Resolution Procedure [[Resolve]](promise2, x).
           if(x !== undefined) resolutionProcedure(promise2, x);
@@ -184,8 +191,7 @@ Promise.prototype.then = function(onFulfilled, onRejected){
  */
 Promise.resolve = function(value){
   var promise = new Promise();
-  promise.state = Promise.STATES.FULFILLED;
-	promise.value = value;
+  promise.resolve(value);
   return promise;
 };
 
@@ -196,8 +202,7 @@ Promise.resolve = function(value){
  */
 Promise.reject = function(reason){
   var promise = new Promise();
-  promise.state = Promise.STATES.REJECTED;
-	promise.reason = reason;
+  promise.reject(reason);
   return promise;
 };
 

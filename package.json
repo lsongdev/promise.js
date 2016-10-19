@@ -3,17 +3,28 @@
   "version": "1.0.0",
   "main": "promise.js",
   "scripts": {
-    "test": "mocha test/test.js"
+    "test": "./node_modules/.bin/mocha test/test.js"
   },
   "repository": {
-    "url": "git@github.com:song940/promise.js.git",
+    "url": "git+ssh://git@github.com/song940/promise.js.git",
     "type": "git"
   },
   "author": "Lsong <song940@gmail.com>",
   "license": "MIT",
   "description": "A promise/A+ implement",
   "devDependencies": {
-    "mocha": "^3.1.2",
-    "promises-aplus-tests": "^2.1.2"
-  }
+    "mocha": "*",
+    "promises-aplus-tests": "*"
+  },
+  "bugs": {
+    "url": "https://github.com/song940/promise.js/issues"
+  },
+  "homepage": "https://github.com/song940/promise.js#readme",
+  "directories": {
+    "test": "test"
+  },
+  "keywords": [
+    "promises",
+    "promises-aplus"
+  ]
 }
