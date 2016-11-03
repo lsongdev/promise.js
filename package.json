@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "promise.js",
   "scripts": {
-    "test": "./node_modules/.bin/mocha test/test.js"
+    "test": "mocha test/test.js"
   },
   "repository": {
     "url": "git+ssh://git@github.com/song940/promise.js.git",
